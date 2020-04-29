@@ -11,8 +11,14 @@ import org.java_websocket.handshake.ServerHandshake;
 
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+
+import javax.crypto.BadPaddingException;
+import javax.crypto.IllegalBlockSizeException;
+import javax.crypto.NoSuchPaddingException;
 
 public class Server {
 
@@ -46,7 +52,11 @@ public class Server {
                 Log.i("SERVER", "Got json from server: " + json);
                 int type = Protocol.getType(json);
                 if(type == Protocol.MESSAGE){
-                   displayIncoming(Protocol.unpackMessage(json));
+                    try {
+                        displayIncoming(Protocol.unpackMessage(json));
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
                 }
 
                 if(type == Protocol.USER_STATUS){
@@ -82,15 +92,17 @@ public class Server {
         }
     }
 
-    private void displayIncoming(Protocol.Message message){
+    private void displayIncoming(Protocol.Message message) throws Exception {
         String name = names.get(message.getSender());
         if(name == null){
             name = "Unnamed";
         }
-        onMessageReceived.accept(new Pair<>(name, message.getEncodedText()));
+        String text = Crypto.decrypt(message.getEncodedText());
+        onMessageReceived.accept(new Pair<>(name,text));
     }
 
-    public void sendMessage(String text){
+    public void sendMessage(String text) throws IllegalBlockSizeException, InvalidKeyException, BadPaddingException, NoSuchAlgorithmException, NoSuchPaddingException {
+        text = Crypto.encrypt(text);
         Protocol.Message mess = new Protocol.Message(text);
         client.send(Protocol.packMessage(mess));
 
